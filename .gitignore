@@ -1,0 +1,8 @@
+target/
+*.iml
+.idea/
+service_proxy.properties
+/bin/
+service_local.properties
+.run/
+.DS_Store

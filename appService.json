@@ -1,0 +1,36 @@
+{
+    "label": "Docs Conversions",
+    "name": "docsconv",
+    "apiVersion": "v1",
+    "configurationType": "GLOBAL",
+    "deployment": {
+        "profiles":[
+            {
+                "name": "default",
+                "label": "Default",
+                "memory": 2048,
+                "offHeapMinFactor": 5,
+                "description": "2GB of memory and 5 off heap min factor"
+            },
+            {
+                "name": "bigFiles",
+                "label": "Big size",
+                "memory": 4096,
+                "offHeapMinFactor": 10,
+                "description": "4GB of memory and 10 off heap min factor"
+            }
+        ],
+        "allowMultipleInstances": true
+    },
+    "status": "ACTIVE",
+    "stores": [],
+    "events": [],
+    "functions": [
+        {
+            "label": "Convert document",
+            "name": "convertDocument"
+        }
+    ],
+    "configuration":[
+    ]
+}
