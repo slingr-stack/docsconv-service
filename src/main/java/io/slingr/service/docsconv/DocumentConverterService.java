@@ -37,11 +37,13 @@ public class DocumentConverterService {
                 .install()
                 .portNumbers(2002)
                 .taskExecutionTimeout(120_000L) // 2 mins max per doc
+                .maxTasksPerProcess(10)
                 .officeHome("/usr/lib/libreoffice")
+                .disableOpengl(true)
                 .build();
 
         // 3. Start LibreOffice
-        this.appLogs.info("Starting LibreOffice...");
+        logInfo("Starting LibreOffice...");
         officeManager.start();
 
         // 4. Build the Converter
@@ -53,7 +55,7 @@ public class DocumentConverterService {
         // This ensures strictly sequential processing
         this.conversionQueue = Executors.newSingleThreadExecutor();
 
-        this.appLogs.info("Service Ready. Conversion Queue initialized.");
+        logInfo("Service Ready. Conversion Queue initialized.");
     }
 
     /**
@@ -64,66 +66,32 @@ public class DocumentConverterService {
      * @return The converted outputFile
      * @throws Exception If conversion fails or is interrupted
      */
-    public File placeConversionTask(File inputFile, File outputFile) throws Exception {
+    public File convert(File inputFile, File outputFile) throws Exception {
         // Validation
         if (!inputFile.exists()) {
             throw new IOException("Input file not found: " + inputFile.getAbsolutePath());
         }
+        logInfo(String.format("[Worker] Starting conversion: %s -> %s%n",
+                inputFile.getName(), outputFile.getName()));
 
-        // Create the task (Callable)
-        Callable<File> conversionTask = () -> {
-            this.appLogs.info(String.format("[Worker] Starting conversion: %s -> %s%n",
-                    inputFile.getName(), outputFile.getName()));
+        converter.convert(inputFile)
+                .to(outputFile)
+                .execute();
 
-            converter.convert(inputFile)
-                    .to(outputFile)
-                    .execute();
-
-            this.appLogs.info(String.format("[Worker] Finished: %s%n", outputFile.getName()));
-            return outputFile;
-        };
-
-        // Submit to queue
-        this.appLogs.info(String.format("[Main] Queuing task for %s. Waiting for worker...%n", inputFile.getName()));
-        Future<File> futureResult = conversionQueue.submit(conversionTask);
-
-        try {
-            // .get() BLOCKS here until the worker finishes this specific task
-            return futureResult.get();
-        } catch (ExecutionException e) {
-            // Unwrap the actual exception (e.g., OfficeException) from the wrapper
-            Throwable cause = e.getCause();
-            throw (cause instanceof Exception) ? (Exception) cause : e;
-        } catch (InterruptedException e) {
-            // Handle thread interruption
-            Thread.currentThread().interrupt();
-            throw new IOException("Conversion waiting was interrupted", e);
-        }
+        logInfo(String.format("[Worker] Finished: %s%n", outputFile.getName()));
+        return outputFile;
     }
 
     /**
      * Clean shutdown of the queue and LibreOffice.
      */
     public void stop() {
-        // 1. Stop accepting new tasks
-        if (conversionQueue != null) {
-            conversionQueue.shutdown();
-            try {
-                // Wait a bit for pending tasks to finish
-                if (!conversionQueue.awaitTermination(5, TimeUnit.SECONDS)) {
-                    conversionQueue.shutdownNow();
-                }
-            } catch (InterruptedException e) {
-                conversionQueue.shutdownNow();
-            }
-        }
-
-        // 2. Stop LibreOffice
+        // Stop LibreOffice
         if (officeManager != null && officeManager.isRunning()) {
             try {
                 officeManager.stop();
             } catch (OfficeException e) {
-                this.appLogs.error("Error stopping OfficeManager: " + e.getMessage());
+                logError("Error stopping OfficeManager: " + e.getMessage(), e);
             }
         }
     }
@@ -133,18 +101,35 @@ public class DocumentConverterService {
         File officeBin = new File("/usr/bin/soffice");
         if (officeBin.exists()) return;
 
-        this.appLogs.info("Installing LibreOffice dependencies...");
+        logInfo("Installing LibreOffice dependencies...");
         String[] command = {
                 "/bin/sh", "-c",
-                "apt-get update && apt-get install -y --no-install-recommends " +
-                        "libreoffice libreoffice-java-common default-jre fonts-liberation"
+                "export DEBIAN_FRONTEND=noninteractive && " +
+                        "apt-get update && apt-get install -y --no-install-recommends " +
+                        "tzdata libreoffice libreoffice-java-common default-jre fonts-liberation libgl1 libglx-mesa0 libxinerama1 libdbus-glib-1-2"
         };
 
         Process p = new ProcessBuilder(command).redirectErrorStream(true).start();
         try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
             String line;
-            while ((line = r.readLine()) != null) this.appLogs.info("[INSTALL]: " + line);
+            while ((line = r.readLine()) != null) System.out.println("[INSTALL]: " + line);
         }
         if (p.waitFor() != 0) throw new RuntimeException("Install failed");
+    }
+
+    private void logInfo(String msg) {
+        if (this.appLogs != null) {
+            this.appLogs.info(msg);
+        } else {
+            System.out.println(msg);
+        }
+    }
+
+    private void logError(String msg, Exception e) {
+        if (this.appLogs != null) {
+            this.appLogs.error(msg, e);
+        } else {
+            System.err.println(msg);
+        }
     }
 }

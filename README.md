@@ -20,13 +20,51 @@ No configuration available.
 
 To convert a document, you should use this: 
 
-```javascript
+```js
 let res = svc.docsconv.convertDocument({
-    input: fileId,
-    outputName: 'output.pdf'
+    inputFileId: fileId,
+    inputMimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    outputMimeType: 'application/pdf'
 });
-log('converted file id: '+res.fileId);
+if (res.status == 'ok') {
+    log('converted file id: '+res.file.fileId);    
+} else {
+    log(res.error);
+}
 ```
+
+Here are the supported mime types:
+
+- Text documents
+  - `application/vnd.openxmlformats-officedocument.wordprocessingml.document` (.docx)
+  - `application/msword` (.doc)
+  - `application/vnd.oasis.opendocument.text` (.odt)
+  - `application/rtf` (.rtf)
+  - `text/plain` (.txt)
+  - `application/pdf` (.pdf, only output)
+  - `text/html` (.html)
+- Spreadsheets
+  - `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` (.xlsx)
+  - `application/vnd.ms-excel` (.xls)
+  - `application/vnd.oasis.opendocument.spreadsheet` (.ods)
+  - `text/csv` (.csv)
+  - `text/tab-separated-values` (.tsv)
+  - `text/html` (.html, only output)
+  - `application/pdf` (.pdf, only output)
+- Presentations
+  - `application/vnd.openxmlformats-officedocument.presentationml.presentation` (.pptx)
+  - `application/vnd.ms-powerpoint` (.ppt)
+  - `application/vnd.oasis.opendocument.presentation` (.odp)
+  - `application/pdf` (.pdf, only output)
+  - `text/html` (.html, only output)
+- Drawings
+  - `application/vnd.oasis.opendocument.graphics` (.odg)
+  - `application/vnd.visio` (.vsd)
+  - `image/svg+xml` (.svg)
+  - `application/pdf` (.pdf, only output)
+  - `image/png` (.png, only output)
+
+You can convert between formats in each category. More options might be possible, you should check the documentation of JODConverter for more information.
 
 ## About SLINGR
 
